@@ -17,7 +17,7 @@ export default class txConfirmation {
     async execute() {
 
         return await this.retryOnFail(async () => {
-            const account = this.account
+            const account = this.account;
 
             try {
                 await this.helpersFunction.waitForGasTxStarknet(this.logger, this.txPayload, this.moduleString, account)
@@ -39,6 +39,7 @@ export default class txConfirmation {
                         if (e.message.includes('Transaction with hash')) {
                             await new Promise(resolve => setTimeout(resolve, 15 * 1000));
                         } else {
+                            await new Promise(resolve => setTimeout(resolve, 15 * 1000));
                             this.logger.error(`${this.moduleString} - An error while executing tx:\n${e}`);
                             throw new Error(`${this.moduleString} - An error while executing tx\n`);
                         }
@@ -80,10 +81,12 @@ export default class txConfirmation {
                             nonce = parseInt(nonce, 16);
                             if (nonce > nonceCash) {
                                 this.logger.info(`\x1b[32m${this.moduleString} - The transaction is fully confirmed in the blockchain | Nonce ${nonce}\x1b[0m`);
+                                 await new Promise(resolve => setTimeout(resolve, 20 * 1000));
                                 return;
                             }
                         }
                     } else if (nonce > nonceCash) {
+                        await new Promise(resolve => setTimeout(resolve, 20 * 1000));
                         this.logger.info(`\x1b[32m${this.moduleString} - The transaction is fully confirmed in the blockchain | Nonce ${nonce}\x1b[0m`);
                     }
                 } else if (flag === 0) {
@@ -113,6 +116,7 @@ export default class txConfirmation {
             } catch (error) {
                 this.logger.error(`${this.moduleString} - Attempt ${attempts + 1} failed with error: ${error}. Retrying...`);
                 attempts++;
+                await new Promise(resolve => setTimeout(resolve, 60 * 1000))
                 await this.helpersFunction.setupExactDealay(General.delayBeforeNextRetry,this.moduleString,this.logger)
                 if (attempts >= maxAttempts) {
                     break

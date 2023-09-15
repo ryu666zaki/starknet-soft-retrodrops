@@ -1,7 +1,8 @@
 import { chainContract, rpc, poolIds } from './other.js';
-import { HDNodeWallet, Mnemonic } from 'ethers';
+import { HDNodeWallet, Wallet } from 'ethers';
 import { mnemonicToSeedSync }  from '@scure/bip39';
 import { HDKey }  from "@scure/bip32";
+
 import {Contract, RpcProvider, ec, CallData, hash, Provider, constants, Account} from 'starknet';
 import { abiMySwapTokensAbi,abiJediSwapStarknetMain,abiJediSwapStarknetReserves,abi_10KSwapStarknetMain,abi_10KSwapStarknetReserves,abiSithSwapStarknetMain,abiMySwapStarknet } from "./abi.js"
 import { Web3 } from 'web3';
@@ -110,17 +111,25 @@ export default class helpersFunctions {
     async getPrivateKeyFromMnemonicStarkNetArgent (StarknetMnemonic) {
 
         try {
-            const mnemo = Mnemonic.fromPhrase(StarknetMnemonic);
-            const signer = HDNodeWallet.fromMnemonic(mnemo);
-            const masterNode = HDNodeWallet.fromSeed(signer.privateKey);
+            const signer = (Wallet.fromPhrase(StarknetMnemonic)).privateKey;
+            const masterNode = HDNodeWallet.fromSeed(
+                this.toHexString(signer));
             const childNode = masterNode.derivePath("m/44'/9004'/0'/0/0");
-
+        
             return '0x' + ec.starkCurve.grindKey(childNode.privateKey).toString();
         }catch (e) {
             console.log(e)
             throw new Error(e)
         }
     };
+
+    toHexString = (value) => {
+    let hex = BigInt(value).toString(16);
+    if (hex.length % 2 !== 0) {
+        hex = '0' + hex;
+    }
+    return '0x' + hex;
+};
 
     async getPrivateKeyFromMnemonicStarkNetBraavos(StarkNetMnemonic){
         const seed = mnemonicToSeedSync(StarkNetMnemonic);
@@ -380,19 +389,19 @@ export default class helpersFunctions {
         const web3 = new Web3(new Web3.providers.HttpProvider(rpc.ARB));
 
         const account = web3.eth.accounts.privateKeyToAccount(mmKey.trim());
-        return account.address
-    }
+        return account.address;
+    };
 
-    async getStarknetAddress(startPrivateKey){
+    async getStarknetAddress (startPrivateKey){
         switch (General.walletName) {
             case "Argent_X":
                 return await this.getArgentXWallet(startPrivateKey)
             case 'Braavos':
                 return getBraavosAddress(startPrivateKey);
         }
-    }
+    };
 
-    async getArgentXWallet(key){
+    async getArgentXWallet (key){
         const argentProxyClassHash = "0x25ec026985a3bf9d0cc1fe17326b245dfdc3ff89b8fde106542a3ea56c5a918";
         const argentAccountClassHash = "0x033434ad846cdd5f23eb73ff09fe6fddd568284a0fb7d1be20ee482f044dabe2";
 
@@ -409,13 +418,41 @@ export default class helpersFunctions {
             AXproxyConstructorCallData,
             0
         );
+    };
 
-    }
+    async checkVersion (provider, address) {
+        const targetHash = '0x1a736d6ed154502257f02b1ccdf4d9d1089f80811cd6acad48e6b6a9d1f2003';
+        const classHash = await provider.getClassHashAt(address);
+
+        if (classHash !== targetHash) {
+            return '0';
+        } else {
+            return '1';
+        }
+    };
+
+    async build_ConstructorCallDataNew (publicKey) {
+        return CallData.compile({
+            owner: publicKey,
+            guardian: 0n
+        });
+    };
+
+    async getArgentXWalletNew (key) {
+        const argentAccountClassHash = "0x1a736d6ed154502257f02b1ccdf4d9d1089f80811cd6acad48e6b6a9d1f2003";
+
+        const publicKey = ec.starkCurve.getStarkKey(key);
+        const constructorCalldata = await this.build_ConstructorCallDataNew(publicKey);
+
+        return hash.calculateContractAddressFromHash(
+            publicKey,
+            argentAccountClassHash,
+            constructorCalldata,
+            0
+        );
+    };
 
     async waitForUpdateBalanceStark(address,logger,accountIndex,balanceCash,moduleString){
-
-        
-
         while (true){
             await new Promise(resolve => setTimeout(resolve, 15 * 1000));
             let balanceNew = await this.balanceCheckerForToken('ETH',address,undefined)
@@ -430,14 +467,9 @@ export default class helpersFunctions {
                 await new Promise(resolve => setTimeout(resolve, 15 * 1000));
             }
         }
-
-    }
+    };
 
     async waitForUpdateBalanceEth(address,logger,accountIndex,balanceCash,web3,moduleString){
-        
-        
-        
-        
         while (true){
             await new Promise(resolve => setTimeout(resolve, 15 * 1000));
             let balanceNew = await web3.eth.getBalance(address);
@@ -451,6 +483,5 @@ export default class helpersFunctions {
                 await new Promise(resolve => setTimeout(resolve, 15 * 1000));
             }
         }
-
-    }
+    };
 }
